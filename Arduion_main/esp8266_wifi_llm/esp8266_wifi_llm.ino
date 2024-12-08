@@ -196,41 +196,42 @@ String detectSwing() {
 /* 判断命令名称并执行对应的方法 */
 void executeCommand(String command)
 {
-    if (command != "TIME" || command != "SHOW"){
-      // 检测挥动并获取类型
-      String swing = detectSwing();
-
-      // 打印挥动类型
-      Serial.println(swing);
-
-      if (command == "LED_ON" && swing == "快速横向挥动")
-      { // 开灯舵机命令
-          LED_ON();
-      }
-      else if (command == "LED_OFF" && swing == "快速横向挥动")
-      { // 关灯舵机命令
-          LED_OFF();
-      }
-      else if (command == "AIR_ON" && swing == "快速竖向挥动")
-      { // 开空调命令
-          AIR_ON();
-      }
-      else if (command == "AIR_OFF" && swing == "快速竖向挥动")
-      { // 关空调命令
-          AIR_OFF();
-      }
-      else
-      { // 未知命令
-          Serial.println("指令或者手势不正确");
-      }
-    }
-    else if(command == "TIME")
-    { // 显示时间命令
+    // 特殊指令直接处理
+    if (command == "TIME") 
+    { 
         TIME_SHOW();
+        return; // 终止函数，避免进入后续逻辑
     }
-    else if(command == "SHOW"){
-      SHOW_OLED();
-    } 
+    if (command == "SHOW") 
+    {
+        SHOW_OLED();
+        return; // 终止函数，避免进入后续逻辑
+    }
+
+    // 处理普通指令（非 "TIME" 和 "SHOW"）
+    String swing = detectSwing(); // 检测挥动并获取类型
+    Serial.println(swing); // 打印挥动类型
+
+    if (command == "LED_ON" && swing == "快速横向挥动")
+    {
+        LED_ON();
+    }
+    else if (command == "LED_OFF" && swing == "快速横向挥动")
+    {
+        LED_OFF();
+    }
+    else if (command == "AIR_ON" && swing == "快速竖向挥动")
+    {
+        AIR_ON();
+    }
+    else if (command == "AIR_OFF" && swing == "快速竖向挥动")
+    {
+        AIR_OFF();
+    }
+    else
+    {
+        Serial.println("指令或者手势不正确");
+    }
 }
 
 void AIR_ON()
@@ -238,6 +239,9 @@ void AIR_ON()
   // 混合颜色（紫色）
   setColor(128, 0, 128);
   delay(2000); // 不放延时可能发送太快，还没有对准空调
+  irsend.sendRaw(rawDataPowerOn, 279, 38);
+  irsend.sendRaw(rawDataPowerOn, 279, 38);
+  irsend.sendRaw(rawDataPowerOn, 279, 38); 
   irsend.sendRaw(rawDataPowerOn, 279, 38);
   irsend.sendRaw(rawDataPowerOn, 279, 38);
   irsend.sendRaw(rawDataPowerOn, 279, 38); 
@@ -485,6 +489,7 @@ void SHOW_OLED()
 {
   // 在响应的末尾添加 "%"
   globalResponse.concat("%");
+  Serial.println(globalResponse);
   MySerial.write(globalResponse.c_str()); // 转换为 const char* 再发送
   delay(1000); // 每秒发送一次
 }

@@ -61,7 +61,7 @@ void loop() {
           } 
           else if (command == "LED_OFF") {
             // 控制舵机转到右边（180度） // 关灯
-            myServo.write(180);
+            myServo.write(90);
             Serial.println("Servo moved to 180 degrees");
             // 发送响应给客户端
             client.println("led_off_success\r\n");
