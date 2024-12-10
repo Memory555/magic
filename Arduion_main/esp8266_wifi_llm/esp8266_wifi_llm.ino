@@ -51,9 +51,12 @@ NTPClient timeClient(ntpUDP);
 
 const char *WIFI_SSID = "玛卡巴卡"; // 填写你的WIFI名称及密码
 const char *WIFI_PWD = "123123123";
+const char* serverUrlNext = "http://192.168.224.100:5100/flip_next";  // 下一页
+const char* serverUrlPrev = "http://192.168.224.100:5100/flip_prev";  // 上一页
 #define PCIP "192.168.224.100"         // 地址一：电脑ip地址，这里存在用命令开关机电脑，注意在路由器上绑定ip，此处主要是用于ping一下，再次查询真实开关机状态
 #define TCP_SERVER_IP "192.168.224.209" // 地址一：控制电脑开关的继电器esp01s模块ip地址，注意在路由器上绑定ip
 #define TCP_SERVER_PORT 6000
+
 
 #define MAX_COMMAND_LENGTH 10
 char command[MAX_COMMAND_LENGTH] = ""; // 存储接收到的命令字符串
@@ -68,12 +71,18 @@ IRsend irsend(kIrLedPin);
 
 // 定义 RGB LED 的引脚
 #define RED_PIN 0   // R - GPIO5 (D3)
-#define GREEN_PIN 14 // G - GPIO4 (D5)
-#define BLUE_PIN 12  // B - GPIO0 (D6)
+#define GREEN_PIN 2 // G - GPIO4 (D4)
+#define BLUE_PIN 14  // B - GPIO0 (D6)
 
 // 定义MUP6050引脚
 #define SW_SDA 4   // SDA - GPIO4 (D2)
 #define SW_SCL 5 // SCL - GPIO5 (D1)
+
+// 定义按键引脚
+const int buttonPin = 1; // 按键连接的引脚
+bool buttonPressed = false; // 防止重复触发
+
+WiFiClient wifiClient; // 创建 WiFiClient 对象
 
 char chBuffer[64];
 int p = 0;
@@ -91,6 +100,8 @@ void setup()
     analogWriteFreq(1000); // 设置 PWM 频率为 1kHz
 
     setColor(255, 255, 255);
+
+    pinMode(buttonPin, INPUT_PULLUP); // 使用内置上拉电阻
 
     // 初始化串口和软串口
     Serial.begin(9600);
@@ -129,28 +140,25 @@ void setup()
     Serial.println("当前时间" + timeClient.getFormattedTime());
 }
 
-void loop()
-{
-    server.handleClient(); // 处理客户端请求
-    if (MySerial.available())
-    {
+void loop() {
+    // 处理客户端请求
+    server.handleClient();
+
+    // 接收串口命令
+    if (MySerial.available()) {
         int commandLength = 0; // 当前接收到的命令长度
-        while (MySerial.available() > 0)
-        {
+        while (MySerial.available() > 0) {
             char c = MySerial.read();
-            if (c == '%')
-            {
+            if (c == '%') {
                 break;
             }
-            if (commandLength >= MAX_COMMAND_LENGTH - 1)
-            {
+            if (commandLength >= MAX_COMMAND_LENGTH - 1) {
                 break;
             }
             command[commandLength++] = c;
         }
-        // command[commandLength] = '\0'; // 末尾添加"\0"作为字符串结束标志
-        if (commandLength > 0)
-        {
+
+        if (commandLength > 0) {
             String c = String(command);
             c.trim();
             Serial.println("Received command: " + c); // 输出接收到的命令
@@ -159,6 +167,33 @@ void loop()
             executeCommand(c); // 执行命令
         }
     }
+
+    // 按键检测逻辑
+    int buttonState = digitalRead(buttonPin);
+    if (buttonState == LOW && !buttonPressed) { // 检测到按键按下
+        buttonPressed = true;
+        sendCommand("next"); // 默认触发下一页
+        delay(200);          // 防抖处理
+    } else if (buttonState == HIGH && buttonPressed) {
+        buttonPressed = false; // 释放按键，重置状态
+    }
+}
+
+// 按下按键
+void sendCommand(const char* command) {
+    HTTPClient http;
+    const char* serverUrl = (strcmp(command, "next") == 0) ? serverUrlNext : serverUrlPrev;
+    http.begin(wifiClient, serverUrl); // 使用新的 API
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{\"command\":\"" + String(command) + "\"}";
+    int httpResponseCode = http.POST(payload);
+
+    Serial.print("Command sent: ");
+    Serial.println(command);
+    Serial.print("Response code: ");
+    Serial.println(httpResponseCode);
+    http.end();
 }
 
 // 检测挥动类型并返回结果
