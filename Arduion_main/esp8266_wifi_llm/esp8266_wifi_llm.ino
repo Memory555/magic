@@ -54,6 +54,9 @@ const char *WIFI_PWD = "123123123";
 const char* serverUrlNext = "http://192.168.224.100:5100/flip_next";  // 下一页
 const char* serverUrlPrev = "http://192.168.224.100:5100/flip_prev";  // 上一页
 // #define PCIP "192.168.224.100"         // 地址一：电脑ip地址，这里存在用命令开关机电脑，注意在路由器上绑定ip，此处主要是用于ping一下，再次查询真实开关机状态
+
+#define PCIP "192.168.224.100"         // 地址一：电脑ip地址，这里存在用命令开关机电脑，注意在路由器上绑定ip，此处主要是用于ping一下，再次查询真实开关机状态
+
 #define TCP_SERVER_IP "192.168.224.209" // 地址一：控制电脑开关的继电器esp01s模块ip地址，注意在路由器上绑定ip
 #define TCP_SERVER_PORT 6000
 
@@ -72,7 +75,7 @@ IRsend irsend(kIrLedPin);
 // 定义 RGB LED 的引脚
 #define RED_PIN 0   // R - GPIO5 (D3)
 #define GREEN_PIN 2 // G - GPIO4 (D4)
-#define BLUE_PIN 14  // B - GPIO0 (D5)
+#define BLUE_PIN 12  // B - GPIO0 (D6)
 
 // 定义MUP6050引脚
 #define SW_SDA 4   // SDA - GPIO4 (D2)
@@ -177,9 +180,21 @@ void loop() {
     } else if (buttonState == HIGH && buttonPressed) {
         buttonPressed = false; // 释放按键，重置状态
     }
+
+    // mpu6050逻辑
+    // 从MPU6050读取加速度和陀螺仪数据
+    accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+    if(ax > 5000){
+      sendCommand("next"); // 下一页
+      delay(200);          // 防抖处理
+    }
+    if(ay <-5000){
+      sendCommand("prev"); // 上一页
+      delay(200);          // 防抖处理
+    }
 }
 
-// 按下按键
+// 按下按键/移动
 void sendCommand(const char* command) {
     HTTPClient http;
     const char* serverUrl = (strcmp(command, "next") == 0) ? serverUrlNext : serverUrlPrev;
@@ -244,28 +259,28 @@ void executeCommand(String command)
     }
 
     // 处理普通指令（非 "TIME" 和 "SHOW"）
-    String swing = detectSwing(); // 检测挥动并获取类型
-    Serial.println(swing); // 打印挥动类型
+    // String swing = detectSwing(); // 检测挥动并获取类型
+    // Serial.println(swing); // 打印挥动类型
 
-    if (command == "LED_ON" && swing == "快速横向挥动")
+    if (command == "LED_ON")
     {
         LED_ON();
     }
-    else if (command == "LED_OFF" && swing == "快速横向挥动")
+    else if (command == "LED_OFF")
     {
         LED_OFF();
     }
-    else if (command == "AIR_ON" && swing == "快速竖向挥动")
+    else if (command == "AIR_ON")
     {
         AIR_ON();
     }
-    else if (command == "AIR_OFF" && swing == "快速竖向挥动")
+    else if (command == "AIR_OFF")
     {
         AIR_OFF();
     }
     else
     {
-        Serial.println("指令或者手势不正确");
+        Serial.println("指令不正确");
     }
 }
 
@@ -277,6 +292,7 @@ void AIR_ON()
   irsend.sendRaw(rawDataPowerOn, 279, 38);
   irsend.sendRaw(rawDataPowerOn, 279, 38);
   irsend.sendRaw(rawDataPowerOn, 279, 38); 
+  Serial.println("到这了");
   irsend.sendRaw(rawDataPowerOn, 279, 38);
   irsend.sendRaw(rawDataPowerOn, 279, 38);
   irsend.sendRaw(rawDataPowerOn, 279, 38); 
