@@ -7,10 +7,12 @@
 #include <WiFiClient.h>
 #include <SoftwareSerial.h>
 #include <ESP8266Ping.h>
-#include <IRremoteESP8266.h>
-#include <IRsend.h>
+#include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
 #include <I2Cdev.h>
 #include <MPU6050.h>
+#include "IRsendMeidi.h"
+#include <IRsend.h>
 
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
     #include "Wire.h"
@@ -68,7 +70,7 @@ SoftwareSerial MySerial(13, 15); // 定义软串口对象，RX=13, TX=15
 
 // 定义红外发射引脚
 const uint16_t kIrLedPin = 16; // D0引脚
-IRsend irsend(kIrLedPin);
+IRsendMeidi irsendmeidi(kIrLedPin);  //声明类对象
 
 // 定义 RGB LED 的引脚
 #define RED_PIN 0   // R - GPIO5 (D3)
@@ -109,7 +111,11 @@ void setup()
     MySerial.begin(115200);
     
     // 初始化红外发送信号
-    irsend.begin();
+    irsendmeidi.begin_2();   //初始化
+    irsendmeidi.setZBPL(40); //设置红外载波频率，单位kHz,不调用此函数则默认38，由于未知原因，我设置为40，示波器测得频率为38左右，当发送信号后没反应时，尝试更改此值。
+    irsendmeidi.setCodeTime(500,1600,550,4400,4400,5220); //设置信号的高低电平占比，分别为标记位，1位，0位，前导码低电平，前导码高电平，间隔码高电平
+    //不调用此函数默认为（500,1600,550,4400,4400,5220）
+
 
     // 初始化I2C（D2为SDA，D1为SCL）
     Wire.begin(SW_SDA, SW_SCL);
@@ -285,15 +291,9 @@ void executeCommand(String command)
 void AIR_ON()
 {
   // 混合颜色（紫色）
-  setColor(128, 0, 128);
-  delay(2000); // 不放延时可能发送太快，还没有对准空调
-  irsend.sendRaw(rawDataPowerOn, 279, 38);
-  irsend.sendRaw(rawDataPowerOn, 279, 38);
-  irsend.sendRaw(rawDataPowerOn, 279, 38); 
-  Serial.println("到这了");
-  irsend.sendRaw(rawDataPowerOn, 279, 38);
-  irsend.sendRaw(rawDataPowerOn, 279, 38);
-  irsend.sendRaw(rawDataPowerOn, 279, 38); 
+  setColor(128, 0, 128);  irsendmeidi.setPowers(1); //打开空调
+  delay(1000); // 重复一次，防止没有成功发送
+  irsendmeidi.setPowers(1); //打开空调
   Serial.println("Sending Power On Signal");
   MySerial.write("air_on_success%");
   delay(5000);
@@ -304,10 +304,9 @@ void AIR_OFF()
 {
   // 混合颜色（红色）
   setColor(255, 0, 0);
-  delay(2000);
-  irsend.sendRaw(rawDataPowerOff, 279, 38);
-  irsend.sendRaw(rawDataPowerOff, 279, 38);
-  irsend.sendRaw(rawDataPowerOff, 279, 38); 
+  irsendmeidi.setPowers(0);    //关闭空调
+  delay(1000); // 重复一次，防止没有成功发送
+  irsendmeidi.setPowers(0);    //关闭空调
   Serial.println("Sending Power Off Signal");
   MySerial.write("air_off_success%");
   delay(5000);
